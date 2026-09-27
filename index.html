@@ -291,7 +291,7 @@ function collide(ax, ay, bx, by, powered = false) {
   // Powered red ramps provide the energy
   // for upward bounces.
 
-  const restitution = powered ? 0.95 : 0.82;
+  const restitution = powered ? 0.95 : 0.85;
 
   const impulse = -(1 + restitution) * velocity;
 
