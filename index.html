@@ -4,6 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>1,000 Likes to Drop!</title>
 
 <style>
@@ -14,8 +15,8 @@
 body {
   margin: 0;
   background: #191f2b;
-  font-family: Arial, sans-serif;
   color: white;
+  font-family: Arial, sans-serif;
   text-align: center;
 }
 
@@ -29,7 +30,7 @@ body {
 .counter {
   font-size: 29px;
   font-weight: bold;
-  padding: 10px;
+  margin: 8px 0 12px;
 }
 
 canvas {
@@ -40,28 +41,34 @@ canvas {
   border-radius: 5px;
 }
 
-#controls {
-  display: none;
+details {
+  margin-top: 12px;
+  padding: 10px;
   background: #29374b;
-  padding: 12px;
-  margin-top: 10px;
   border-radius: 8px;
 }
 
+summary {
+  cursor: pointer;
+}
+
 input {
-  width: 130px;
+  width: 125px;
   padding: 10px;
-  font-size: 18px;
+  font-size: 17px;
+  border: none;
+  border-radius: 5px;
 }
 
 button {
+  padding: 10px;
+  margin: 4px;
   background: #df3048;
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 11px;
-  margin: 4px;
+  border-radius: 5px;
   cursor: pointer;
+  font-weight: bold;
 }
 </style>
 </head>
@@ -74,38 +81,47 @@ button {
 ❤️ 0 / 1,000
 </div>
 
-<canvas id="game" width="340" height="400"></canvas>
+<canvas
+  id="game"
+  width="340"
+  height="400">
+</canvas>
 
-<div id="controls">
-  <p>Current total likes</p>
+<details id="controls">
 
-  <input
-    id="likesInput"
-    type="number"
-    min="0"
-    value="0"
-  >
+<summary>⚙ Controls</summary>
 
-  <button id="updateBtn">UPDATE</button>
+<p>Enter your current likes</p>
 
-  <br>
+<input
+  id="likesInput"
+  type="number"
+  min="0"
+  value="0"
+>
 
-  <button id="plus10">+10</button>
-  <button id="plus50">+50</button>
-  <button id="plus100">+100</button>
+<button id="updateBtn">UPDATE</button>
 
-  <br>
+<br>
 
-  <button id="pauseBtn">PAUSE</button>
-</div>
+<button id="plus10">+10</button>
+<button id="plus50">+50</button>
+<button id="plus100">+100</button>
+
+<br>
+
+<button id="pauseBtn">PAUSE</button>
+<button id="resetBtn">RESET</button>
+
+</details>
 
 </div>
 
 <script>
 
-// ====================================
+// ===================================
 // GAME SETTINGS
-// ====================================
+// ===================================
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -114,22 +130,31 @@ const W = 340;
 const H = 400;
 
 const GOAL = 1000;
-const BALL_RADIUS = 10;
-
-// Movement speed.
-// Lower numbers mean slower movement.
-
-const SPEED = 0.65;
 
 let likes = 0;
 let paused = false;
 let completed = false;
 let releaseRequested = false;
-let releasing = false;
 
-// ====================================
-// APPROVED RAMPS - UNCHANGED
-// ====================================
+// ===================================
+// BALL
+// ===================================
+
+const BALL_RADIUS = 10;
+
+// Larger number means slower movement.
+
+const BALL_SPEED = 0.65;
+
+const ball = {
+  x: 100,
+  y: 75
+};
+
+// ===================================
+// ORIGINAL APPROVED RAMPS
+// DO NOT CHANGE
+// ===================================
 
 const leftRamp = {
   x1: 16,
@@ -145,83 +170,96 @@ const rightRamp = {
   y2: 193
 };
 
-// ====================================
+// ===================================
 // HEART OPENING
-// ====================================
+// ===================================
 
 const holeLeft = 156;
 const holeRight = 184;
+
+const wallTop = 193;
 const gateY = 225;
 
-// ====================================
-// BALL
-// ====================================
+// Ball diameter: 20 pixels.
+// Opening width: 28 pixels.
 
-const ball = {
-  x: 100,
-  y: 75
-};
+// ===================================
+// ANIMATION PATH
+// ===================================
 
-// ====================================
-// CONTROLLED BOUNCE PATH
-// ====================================
-
-// Contact positions are placed near
-// the visible red ramp surfaces.
+// These positions control the ball.
+// The ramps themselves never move.
 //
-// Each bounce travels through a high
-// point before reaching another ramp.
+// The ball approaches the visible
+// ramps and changes direction.
 //
-// The path never enters the heart.
+// The path loops until the goal.
 
-const contacts = [
-  {x: 87,  y: 139},
-  {x: 251, y: 119},
-  {x: 147, y: 177},
-  {x: 210, y: 156},
-  {x: 106, y: 151},
-  {x: 275, y: 96},
-  {x: 138, y: 171},
-  {x: 229, y: 138}
+const route = [
+
+  {x:100, y:75},
+
+  // Contact near left ramp.
+  {x:70, y:153},
+
+  // Bounce upward.
+  {x:163, y:52},
+
+  // Contact near right ramp.
+  {x:265, y:132},
+
+  // Bounce across the board.
+  {x:176, y:78},
+
+  // Contact near left ramp.
+  {x:112, y:179},
+
+  // Bounce upward again.
+  {x:207, y:63},
+
+  // Contact near right ramp.
+  {x:234, y:161},
+
+  // Approach the heart.
+  {x:170, y:211},
+
+  // Bounce away before entering.
+  {x:117, y:83},
+
+  // Return toward starting area.
+  {x:100, y:75}
+
 ];
 
-// Heights of the arcs between contacts.
-
-const arcHeights = [
-  82,
-  65,
-  39,
-  69,
-  86,
-  75,
-  43,
-  76
-];
-
-// Duration of each arc in milliseconds.
+// Animation durations in milliseconds.
 
 const durations = [
-  2800,
-  2600,
+  1700,
+  2100,
+  1800,
+  2100,
+  1700,
   2300,
-  2700,
-  3000,
-  2800,
-  2400,
-  2900
+  1700,
+  2200,
+  2300,
+  2100
 ];
 
-let segment = -1;
+let segment = 0;
 let elapsed = 0;
-let previousFrame = null;
 
-// ====================================
+let lastFrame = null;
+
+// ===================================
 // LIKE COUNTER
-// ====================================
+// ===================================
 
 function updateCounter() {
+
   document.getElementById("counter").textContent =
     "❤️ " + likes.toLocaleString() + " / 1,000";
+
 }
 
 function setLikes(value) {
@@ -230,7 +268,9 @@ function setLikes(value) {
 
   const n = Number(value);
 
-  if (!Number.isFinite(n) || n < 0) return;
+  if (!Number.isFinite(n) || n < 0) {
+    return;
+  }
 
   likes = Math.floor(n);
 
@@ -238,18 +278,22 @@ function setLikes(value) {
 
   updateCounter();
 
-  // Unlock only at the target.
-
   if (likes >= GOAL) {
     releaseRequested = true;
-  } else if (!releasing) {
+  } else {
     releaseRequested = false;
   }
+
 }
 
-document.getElementById("updateBtn").onclick = () => {
-  setLikes(document.getElementById("likesInput").value);
-};
+document.getElementById("updateBtn").onclick =
+  function() {
+
+    setLikes(
+      document.getElementById("likesInput").value
+    );
+
+  };
 
 document.getElementById("plus10").onclick =
   () => setLikes(likes + 10);
@@ -260,72 +304,90 @@ document.getElementById("plus50").onclick =
 document.getElementById("plus100").onclick =
   () => setLikes(likes + 100);
 
+// ===================================
+// PAUSE AND RESET
+// ===================================
+
 document.getElementById("pauseBtn").onclick =
   function() {
+
     paused = !paused;
-    this.textContent = paused ? "PLAY" : "PAUSE";
+
+    this.textContent =
+      paused ? "PLAY" : "PAUSE";
+
   };
 
-// ====================================
-// HIDDEN CONTROLS
-// ====================================
+function resetGame() {
 
-// Press C to show or hide the controls.
-// No Reset button appears on the game.
+  likes = 0;
+  paused = false;
+  completed = false;
+  releaseRequested = false;
 
-document.addEventListener("keydown", function(e) {
+  segment = 0;
+  elapsed = 0;
 
-  if (
-    e.key.toLowerCase() === "c" &&
-    e.target.tagName !== "INPUT"
-  ) {
+  releasing = false;
+  releaseElapsed = 0;
 
-    const panel = document.getElementById("controls");
+  ball.x = route[0].x;
+  ball.y = route[0].y;
 
-    panel.style.display =
-      panel.style.display === "block"
-      ? "none"
-      : "block";
-  }
-});
+  lastFrame = null;
 
-// ====================================
-// DRAWING HELPERS
-// ====================================
+  document.getElementById("likesInput").value = 0;
 
-function line(x1, y1, x2, y2) {
+  document.getElementById("pauseBtn").textContent =
+    "PAUSE";
 
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
+  updateCounter();
+
 }
 
-// ====================================
-// HEART
-// ====================================
+document.getElementById("resetBtn").onclick =
+  resetGame;
 
-function drawHeart(x, y, size) {
+// ===================================
+// DRAW RED LINES
+// ===================================
+
+function line(x1,y1,x2,y2) {
+
+  ctx.beginPath();
+
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x2,y2);
+
+  ctx.stroke();
+
+}
+
+// ===================================
+// HEART
+// ===================================
+
+function heart(x,y,size) {
 
   ctx.save();
 
-  ctx.translate(x, y);
-  ctx.scale(size, size);
+  ctx.translate(x,y);
+  ctx.scale(size,size);
 
   ctx.beginPath();
 
-  ctx.moveTo(0, 0.4);
+  ctx.moveTo(0,0.4);
 
   ctx.bezierCurveTo(
-    -1.1, -0.3,
-    -0.9, -1.1,
-    0, -0.45
+    -1.1,-0.3,
+    -0.9,-1.1,
+    0,-0.45
   );
 
   ctx.bezierCurveTo(
-    0.9, -1.1,
-    1.1, -0.3,
-    0, 0.4
+    0.9,-1.1,
+    1.1,-0.3,
+    0,0.4
   );
 
   ctx.closePath();
@@ -334,26 +396,27 @@ function drawHeart(x, y, size) {
   ctx.fill();
 
   ctx.restore();
+
 }
 
-// ====================================
+// ===================================
 // SILVER BALL
-// ====================================
+// ===================================
 
 function drawBall() {
 
   const gradient = ctx.createRadialGradient(
-    ball.x - 3,
-    ball.y - 4,
+    ball.x-3,
+    ball.y-4,
     1,
     ball.x,
     ball.y,
     BALL_RADIUS
   );
 
-  gradient.addColorStop(0, "#ffffff");
-  gradient.addColorStop(0.4, "#c5ced7");
-  gradient.addColorStop(1, "#46515d");
+  gradient.addColorStop(0,"#ffffff");
+  gradient.addColorStop(0.4,"#c5ced7");
+  gradient.addColorStop(1,"#46515d");
 
   ctx.beginPath();
 
@@ -362,31 +425,33 @@ function drawBall() {
     ball.y,
     BALL_RADIUS,
     0,
-    Math.PI * 2
+    Math.PI*2
   );
 
   ctx.fillStyle = gradient;
   ctx.fill();
+
 }
 
-// ====================================
-// DRAW THE GAME
-// ====================================
+// ===================================
+// DRAW GAME
+// ===================================
 
 function drawGame() {
 
-  ctx.clearRect(0, 0, W, H);
+  ctx.clearRect(0,0,W,H);
 
   ctx.fillStyle = "#edf8ff";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0,0,W,H);
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#34445d";
+
   ctx.font = "bold 12px Arial";
+  ctx.fillStyle = "#34445d";
 
   ctx.fillText(
     "1,000 LIKES TO DROP!",
-    W / 2,
+    W/2,
     24
   );
 
@@ -395,7 +460,7 @@ function drawGame() {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  // Your original approved ramps.
+  // Original ramps, unchanged.
 
   line(
     leftRamp.x1,
@@ -411,22 +476,46 @@ function drawGame() {
     rightRamp.y2
   );
 
-  // Heart opening.
+  // Vertical sides.
 
-  line(holeLeft, 193, holeLeft, gateY);
-  line(holeRight, 193, holeRight, gateY);
+  line(
+    holeLeft,
+    wallTop,
+    holeLeft,
+    gateY
+  );
 
-  // Gate remains closed before 1,000.
+  line(
+    holeRight,
+    wallTop,
+    holeRight,
+    gateY
+  );
+
+  // Heart gate.
 
   if (likes < GOAL) {
 
-    line(holeLeft, gateY, holeRight, gateY);
+    line(
+      holeLeft,
+      gateY,
+      holeRight,
+      gateY
+    );
 
-    drawHeart(170, 217, 11);
+    heart(
+      W/2,
+      gateY-8,
+      11
+    );
 
   } else {
 
-    drawHeart(170, 246, 11);
+    heart(
+      W/2,
+      gateY+19,
+      11
+    );
 
   }
 
@@ -436,192 +525,201 @@ function drawGame() {
 
   if (completed) {
 
-    ctx.font = "bold 25px Arial";
+    ctx.font = "bold 26px Arial";
     ctx.fillStyle = "#169b59";
 
     ctx.fillText(
       "YOU DID IT!",
-      W / 2,
+      W/2,
       330
     );
+
   }
+
 }
 
-// ====================================
-// MOVEMENT HELPERS
-// ====================================
+// ===================================
+// MOVEMENT
+// ===================================
 
-function lerp(a, b, t) {
-  return a + (b - a) * t;
+function interpolate(a,b,t) {
+
+  return a+(b-a)*t;
+
 }
 
-// Smooth timing without abrupt stops
-// in the middle of each flight.
+// Smooth movement between points.
 
-function ease(t) {
-  return t * t * (3 - 2 * t);
+function smooth(t) {
+
+  return t*t*(3-2*t);
+
 }
 
-// ====================================
-// RELEASE ANIMATION
-// ====================================
+// ===================================
+// RELEASE
+// ===================================
 
+let releasing = false;
 let releaseElapsed = 0;
 let releaseStart = null;
 
 function startRelease() {
 
   releasing = true;
-  releaseRequested = false;
   releaseElapsed = 0;
 
   releaseStart = {
     x: ball.x,
     y: ball.y
   };
+
 }
 
 function moveRelease(delta) {
 
   releaseElapsed += delta;
 
-  // Approach the now-open heart.
+  // Approach the heart.
 
-  if (releaseElapsed < 2200) {
+  if (releaseElapsed < 2000) {
 
-    const t = ease(
-      Math.min(releaseElapsed / 2200, 1)
+    const t = smooth(
+      Math.min(releaseElapsed/2000,1)
     );
 
-    ball.x = lerp(releaseStart.x, 170, t);
-    ball.y = lerp(releaseStart.y, 211, t);
+    ball.x = interpolate(
+      releaseStart.x,
+      170,
+      t
+    );
+
+    ball.y = interpolate(
+      releaseStart.y,
+      211,
+      t
+    );
 
   } else {
 
-    // Drop through the opening.
+    // Pass through the open gate.
 
     const t = Math.min(
-      (releaseElapsed - 2200) / 1600,
+      (releaseElapsed-2000)/1700,
       1
     );
 
     ball.x = 170;
-    ball.y = 211 + 205 * t * t;
+    ball.y = 211+220*t*t;
 
     if (t >= 1) {
       completed = true;
     }
+
   }
+
 }
 
-// ====================================
-// CONTROLLED BALL MOVEMENT
-// ====================================
+// ===================================
+// MAIN BALL MOVEMENT
+// ===================================
 
 function moveBall(delta) {
 
-  if (paused || completed) return;
-
-  if (releasing) {
-    moveRelease(delta);
+  if (paused || completed) {
     return;
   }
 
-  // At 1,000 likes, release the ball.
+  if (releasing) {
+
+    moveRelease(delta);
+    return;
+
+  }
+
+  // Release only when the counter
+  // reaches 1,000 likes.
 
   if (releaseRequested) {
+
     startRelease();
     moveRelease(delta);
     return;
+
   }
 
-  elapsed += delta * SPEED;
+  // Controlled movement prevents
+  // accidental entry into the hole.
 
-  // Initial drop to the first ramp.
+  elapsed += delta*BALL_SPEED;
 
-  if (segment === -1) {
-
-    const t = Math.min(elapsed / 1800, 1);
-
-    ball.x = lerp(100, contacts[0].x, t);
-    ball.y = lerp(75, contacts[0].y, t * t);
-
-    if (t >= 1) {
-      segment = 0;
-      elapsed = 0;
-    }
-
-    return;
-  }
-
-  // Each segment moves between two
-  // ramp-contact positions.
-
-  const start = contacts[segment];
-
-  const nextIndex =
-    (segment + 1) % contacts.length;
-
-  const end = contacts[nextIndex];
+  const start = route[segment];
+  const end = route[segment+1];
 
   const duration = durations[segment];
 
-  const t = Math.min(
-    elapsed / duration,
+  const progress = Math.min(
+    elapsed/duration,
     1
   );
 
-  // Horizontal travel.
+  const t = smooth(progress);
 
-  ball.x = lerp(
+  ball.x = interpolate(
     start.x,
     end.x,
-    ease(t)
+    t
   );
 
-  // Vertical travel with a visible arc.
-  // Both endpoints remain near the ramps.
+  ball.y = interpolate(
+    start.y,
+    end.y,
+    t
+  );
 
-  ball.y =
-    lerp(start.y, end.y, t) -
-    arcHeights[segment] *
-    4 * t * (1 - t);
+  if (progress >= 1) {
 
-  if (t >= 1) {
-
-    segment = nextIndex;
     elapsed = 0;
+    segment++;
+
+    if (segment >= route.length-1) {
+      segment = 0;
+    }
+
   }
+
 }
 
-// ====================================
+// ===================================
 // ANIMATION LOOP
-// ====================================
+// ===================================
 
 function animate(time) {
 
-  if (previousFrame === null) {
-    previousFrame = time;
+  if (lastFrame === null) {
+    lastFrame = time;
   }
 
   const delta = Math.min(
-    time - previousFrame,
+    time-lastFrame,
     50
   );
 
-  previousFrame = time;
+  lastFrame = time;
 
   moveBall(delta);
   drawGame();
 
   requestAnimationFrame(animate);
+
 }
 
-// ====================================
-// START
-// ====================================
+// ===================================
+// START GAME
+// ===================================
 
 updateCounter();
+
 requestAnimationFrame(animate);
 
 </script>
